@@ -7,34 +7,35 @@ import java.util.Map;
 
 public class MQTTSinkConnectorConfig extends AbstractConfig {
 
-    public static final String BROKER = "mqtt.broker";
-    public static final String BROKER_DOC = "Host and port of the MQTT broker, eg: tcp://192.168.1.1:1883";
+    // MQTT Configuration
+    public static final String MQTT_BROKER = "mqtt.broker";
+    public static final String MQTT_BROKER_DOC = "Host and port of the MQTT broker, eg: tcp://192.168.1.1:1883";
 
-    public static final String CLIENTID = "mqtt.clientID";
-    public static final String CLIENTID_DOC = "clientID";
+    public static final String MQTT_CLIENT_ID = "mqtt.client-id";
+    public static final String MQTT_CLIENT_ID_DOC = "client-id";
 
     public static final String MQTT_TOPIC = "mqtt.topic";
-    public static final String MQTT_TOPIC_DOC = "List of topic names to subscribe to";
+    public static final String MQTT_TOPIC_DOC = "List of topic names to publish to";
 
-    public static final String MQTT_ARC = "mqtt.automaticReconnect";
-    public static final String MQTT_ARC_DOC = "set Automatic reconnect, default true";
+    public static final String MQTT_TOPIC_APPEND_KAFKA_TOPIC_NAME = "mqtt.topic.append-kafka-topic-name";
+    public static final String MQTT_TOPIC_APPEND_KAFKA_TOPIC_NAME_DOC = "append translated kafka Topic Name to mqtt.topic, default is false";
 
-    public static final String MQTT_KEEPALIVEINTERVAL = "mqtt.keepAliveInterval";
-    public static final String MQTT_KEEPALIVEINTERVAL_DOC = "set the keepalive interval, default is 60 seconds";
+    public static final String MQTT_AUTOMATIC_RECONNECT = "mqtt.automatic-reconnect";
+    public static final String MQTT_AUTOMATIC_RECONNECT_DOC = "set Automatic reconnect, default true";
 
-    public static final String MQTT_CLEANSESSION = "mqtt.cleanSession";
-    public static final String MQTT_CLEANSESSION_DOC = "Sets whether the client and server should remember state across restarts and reconnects, default is true";
+    public static final String MQTT_KEEP_ALIVE_INTERVAL = "mqtt.keep-alive-interval";
+    public static final String MQTT_KEEP_ALIVE_INTERVAL_DOC = "set the keepalive interval, default is 60 seconds";
 
-    public static final String MQTT_CONNECTIONTIMEOUT = "mqtt.connectionTimeout";
-    public static final String MQTT_CONNECTIONTIMEOUT_DOC = "Sets the connection timeout, default is 30";
+    public static final String MQTT_CLEAN_START = "mqtt.clean-start";
+    public static final String MQTT_CLEAN_START_DOC = "Sets whether the client and server should remember state across restarts and reconnects, default is true";
 
-    public static final String KAFKA_TOPIC = "topics";
-    public static final String KAFKA_TOPIC_DOC = "List of kafka topics to consume from";
+    public static final String MQTT_CONNECTION_TIMEOUT = "mqtt.connection-timeout";
+    public static final String MQTT_CONNECTION_TIMEOUT_DOC = "Sets the connection timeout, default is 30";
 
     public static final String MQTT_QOS = "mqtt.qos";
     public static final String MQTT_QOS_DOC = "Quality of service MQTT messaging, default is 1 (at least once)";
 
-    public static final String MQTT_USERNAME = "mqtt.userName";
+    public static final String MQTT_USERNAME = "mqtt.username";
     public static final String MQTT_USERNAME_DOC = "Sets the username for the MQTT connection timeout, default is \"\"";
 
     public static final String MQTT_PASSWORD = "mqtt.password";
@@ -46,48 +47,49 @@ public class MQTTSinkConnectorConfig extends AbstractConfig {
 
     public static ConfigDef configDef() {
         return new ConfigDef()
-                .define(BROKER,
+                .define(MQTT_BROKER,
                         ConfigDef.Type.STRING,
                         ConfigDef.Importance.HIGH,
-                        BROKER_DOC)
-                .define(CLIENTID,
+                        MQTT_BROKER_DOC)
+                .define(MQTT_CLIENT_ID,
                         ConfigDef.Type.STRING,
                         ConfigDef.Importance.HIGH,
-                        CLIENTID_DOC)
+                        MQTT_CLIENT_ID_DOC)
                 .define(MQTT_TOPIC,
                         ConfigDef.Type.STRING,
                         ConfigDef.Importance.HIGH,
                         MQTT_TOPIC_DOC)
-                .define(KAFKA_TOPIC,
-                        ConfigDef.Type.LIST,
+                .define(MQTT_TOPIC_APPEND_KAFKA_TOPIC_NAME,
+                        ConfigDef.Type.BOOLEAN,
+                        false,
                         ConfigDef.Importance.HIGH,
-                        KAFKA_TOPIC_DOC)
+                        MQTT_TOPIC_APPEND_KAFKA_TOPIC_NAME_DOC)
                 .define(MQTT_QOS,
                         ConfigDef.Type.INT,
                         1,
                         ConfigDef.Range.between(1,3),
                         ConfigDef.Importance.MEDIUM,
                         MQTT_QOS_DOC)
-                .define(MQTT_ARC,
+                .define(MQTT_AUTOMATIC_RECONNECT,
                         ConfigDef.Type.BOOLEAN,
                         true,
                         ConfigDef.Importance.MEDIUM,
-                        MQTT_ARC_DOC)
-                .define(MQTT_KEEPALIVEINTERVAL,
+                        MQTT_AUTOMATIC_RECONNECT_DOC)
+                .define(MQTT_KEEP_ALIVE_INTERVAL,
                         ConfigDef.Type.INT,
                         60,
                         ConfigDef.Importance.LOW,
-                        MQTT_KEEPALIVEINTERVAL_DOC)
-                .define(MQTT_CLEANSESSION,
+                        MQTT_KEEP_ALIVE_INTERVAL_DOC)
+                .define(MQTT_CLEAN_START,
                         ConfigDef.Type.BOOLEAN,
                         true,
                         ConfigDef.Importance.LOW,
-                        MQTT_CLEANSESSION_DOC)
-                .define(MQTT_CONNECTIONTIMEOUT,
+                        MQTT_CLEAN_START_DOC)
+                .define(MQTT_CONNECTION_TIMEOUT,
                         ConfigDef.Type.INT,
                         30,
                         ConfigDef.Importance.LOW,
-                        MQTT_CONNECTIONTIMEOUT_DOC)
+                        MQTT_CONNECTION_TIMEOUT_DOC)
                 .define(MQTT_USERNAME,
                         ConfigDef.Type.STRING,
                         "",

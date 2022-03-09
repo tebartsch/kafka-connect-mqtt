@@ -1,9 +1,8 @@
 package com.bartsch.kafka.connect;
 
 import com.bartsch.kafka.connect.config.MQTTSinkConnectorConfig;
-import com.bartsch.kafka.connect.config.MQTTSourceConnectorConfig;
 import org.apache.kafka.connect.sink.SinkRecord;
-import org.eclipse.paho.client.mqttv3.MqttMessage;
+import org.eclipse.paho.mqttv5.common.MqttMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -12,9 +11,9 @@ import org.slf4j.LoggerFactory;
  */
 public class MQTTSinkConverter {
 
-    private MQTTSinkConnectorConfig mqttSinkConnectorConfig;
+    private final MQTTSinkConnectorConfig mqttSinkConnectorConfig;
 
-    private Logger log = LoggerFactory.getLogger(MQTTSinkConverter.class);
+    private final Logger log = LoggerFactory.getLogger(MQTTSinkConverter.class);
 
     public MQTTSinkConverter(MQTTSinkConnectorConfig mqttSinkConnectorConfig) {
         this.mqttSinkConnectorConfig = mqttSinkConnectorConfig;
@@ -25,7 +24,7 @@ public class MQTTSinkConverter {
 
         MqttMessage mqttMessage = new MqttMessage();
         mqttMessage.setPayload(((String)sinkRecord.value()).getBytes());
-        mqttMessage.setQos(this.mqttSinkConnectorConfig.getInt(MQTTSourceConnectorConfig.MQTT_QOS));
+        mqttMessage.setQos(this.mqttSinkConnectorConfig.getInt(MQTTSinkConnectorConfig.MQTT_QOS));
         log.trace("Result MQTTMessage: " + mqttMessage);
         return mqttMessage;
     }

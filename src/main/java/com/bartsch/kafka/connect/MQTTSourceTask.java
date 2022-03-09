@@ -6,75 +6,116 @@ import com.github.jcustenborder.kafka.connect.utils.data.SourceRecordDequeBuilde
 import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.apache.kafka.connect.source.SourceTask;
-import org.eclipse.paho.client.mqttv3.*;
-import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
+import org.eclipse.paho.mqttv5.client.*;
+import org.eclipse.paho.mqttv5.client.persist.MemoryPersistence;
+import org.eclipse.paho.mqttv5.common.*;
+import org.eclipse.paho.mqttv5.common.packet.MqttProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
 /**
  * Actual implementation of the Kafka Connect MQTT Source Task
  */
-public class MQTTSourceTask extends SourceTask implements IMqttMessageListener {
+public class MQTTSourceTask extends SourceTask {
 
-    private Logger log = LoggerFactory.getLogger(MQTTSourceConnector.class);
+    private final Logger log = LoggerFactory.getLogger(MQTTSourceConnector.class);
     private MQTTSourceConnectorConfig config;
     private MQTTSourceConverter mqttSourceConverter;
     private SourceRecordDeque sourceRecordDeque;
 
-    private IMqttClient mqttClient;
+    private IMqttAsyncClient mqttAsyncClient;
 
     public void start(Map<String, String> props) {
         config = new MQTTSourceConnectorConfig(props);
         mqttSourceConverter = new MQTTSourceConverter(config);
-        this.sourceRecordDeque = SourceRecordDequeBuilder.of().batchSize(4096).emptyWaitMs(100).maximumCapacityTimeoutMs(60000).maximumCapacity(50000).build();
+        sourceRecordDeque = SourceRecordDequeBuilder.of().batchSize(4096).emptyWaitMs(100).maximumCapacityTimeoutMs(60000).maximumCapacity(50000).build();
         try {
-            mqttClient = new MqttClient(config.getString(MQTTSourceConnectorConfig.BROKER), config.getString(MQTTSourceConnectorConfig.CLIENTID), new MemoryPersistence());
+            mqttAsyncClient = new MqttAsyncClient(config.getString(MQTTSourceConnectorConfig.MQTT_BROKER), config.getString(MQTTSourceConnectorConfig.MQTT_CLIENT_ID), new MemoryPersistence());
+            mqttAsyncClient.setCallback(new MqttCallback() {
+                @Override
+                public void disconnected(MqttDisconnectResponse disconnectResponse) {
+                    throw new ConnectException(disconnectResponse.toString());
+                }
 
-            log.info("Connecting to MQTT Broker " + config.getString(MQTTSourceConnectorConfig.BROKER));
-            connect(mqttClient);
-            log.info("Connected to MQTT Broker");
+                @Override
+                public void mqttErrorOccurred(MqttException exception) {
+                    throw new ConnectException(exception);
+                }
 
-            String topicSubscription = this.config.getString(MQTTSourceConnectorConfig.MQTT_TOPIC);
-            int qosLevel = this.config.getInt(MQTTSourceConnectorConfig.MQTT_QOS);
+                @Override
+                public void messageArrived(String topic, MqttMessage message) throws Exception {
+                    log.debug("Message " + message.toDebugString() + " arrived in connector from topic " + topic);
+                    SourceRecord record = mqttSourceConverter.convert(topic, message);
+                    log.debug("Converted record: " + record);
+                    sourceRecordDeque.add(record);
+                }
 
-            log.info("Subscribing to " + topicSubscription + " with QOS " + qosLevel);
-            mqttClient.subscribe(topicSubscription, qosLevel, (topic, message) -> {
-                log.debug("Message arrived in connector from topic " + topic);
-                SourceRecord record = mqttSourceConverter.convert(topic, message);
-                log.debug("Converted record: " + record);
-                sourceRecordDeque.add(record);
+                @Override
+                public void deliveryComplete(IMqttToken token) {
+
+                }
+
+                @Override
+                public void connectComplete(boolean reconnect, String serverURI) {
+                    log.info("Connected to MQTT Broker");
+                    List<String> topicFilterList = config.getList(MQTTSourceConnectorConfig.MQTT_TOPIC_FILTER_LIST);
+                    int qosLevel = config.getInt(MQTTSourceConnectorConfig.MQTT_QOS);
+
+                    for (String topicFilter: topicFilterList) {
+                        log.info("Subscribing to " + topicFilter + " with QOS " + qosLevel);
+                        try {
+                            IMqttToken subscribeToken = mqttAsyncClient.subscribe(new MqttSubscription[]{new MqttSubscription(topicFilter, qosLevel)});
+                            subscribeToken.waitForCompletion(5000);
+                        } catch (MqttException e) {
+                            throw new ConnectException(e);
+                        }
+                        log.info("Subscribed to " + topicFilter + " with QOS " + qosLevel);
+                    }
+                }
+
+                @Override
+                public void authPacketArrived(int reasonCode, MqttProperties properties) {
+
+                }
             });
-            log.info("Subscribed to " + topicSubscription + " with QOS " + qosLevel);
+
+
+            log.info("Connecting to MQTT Broker " + config.getString(MQTTSourceConnectorConfig.MQTT_BROKER));
+            IMqttToken connectToken = connect(mqttAsyncClient);
+            connectToken.waitForCompletion(5000);
+
+
         }
         catch (MqttException e) {
             throw new ConnectException(e);
         }
     }
 
-    private void connect(IMqttClient mqttClient) throws MqttException{
-        MqttConnectOptions connOpts = new MqttConnectOptions();
-        connOpts.setCleanSession(config.getBoolean(MQTTSourceConnectorConfig.MQTT_CLEANSESSION));
-        connOpts.setKeepAliveInterval(config.getInt(MQTTSourceConnectorConfig.MQTT_KEEPALIVEINTERVAL));
-        connOpts.setConnectionTimeout(config.getInt(MQTTSourceConnectorConfig.MQTT_CONNECTIONTIMEOUT));
-        connOpts.setAutomaticReconnect(config.getBoolean(MQTTSourceConnectorConfig.MQTT_ARC));
+    private IMqttToken connect(IMqttAsyncClient mqttAsyncClient) throws MqttException{
+        MqttConnectionOptions connOpts = new MqttConnectionOptions();
+        connOpts.setCleanStart(config.getBoolean(MQTTSourceConnectorConfig.MQTT_CLEAN_START));
+        connOpts.setKeepAliveInterval(config.getInt(MQTTSourceConnectorConfig.MQTT_KEEP_ALIVE_INTERVAL));
+        connOpts.setConnectionTimeout(config.getInt(MQTTSourceConnectorConfig.MQTT_CONNECTION_TIMEOUT));
+        connOpts.setAutomaticReconnect(config.getBoolean(MQTTSourceConnectorConfig.MQTT_AUTOMATIC_RECONNECT));
 
-        if (!config.getString(MQTTSourceConnectorConfig.MQTT_USERNAME).equals("") && !config.getPassword(MQTTSourceConnectorConfig.MQTT_PASSWORD).equals("")) {
+        if (!config.getString(MQTTSourceConnectorConfig.MQTT_USERNAME).equals("") && !config.getPassword(MQTTSourceConnectorConfig.MQTT_PASSWORD).value().equals("")) {
             connOpts.setUserName(config.getString(MQTTSourceConnectorConfig.MQTT_USERNAME));
-            connOpts.setPassword(config.getPassword(MQTTSourceConnectorConfig.MQTT_PASSWORD).value().toCharArray());
+            connOpts.setPassword(config.getPassword(MQTTSourceConnectorConfig.MQTT_PASSWORD).value().getBytes(StandardCharsets.UTF_8));
         }
 
         log.info("MQTT Connection properties: " + connOpts);
 
-        mqttClient.connect(connOpts);
+        return mqttAsyncClient.connect(connOpts);
+
     }
 
     /**
-     * method is called periodically by the Connect framework
+     * Method is called periodically by the Connect framework
      *
-     * @return
      * @throws InterruptedException
      */
     public List<SourceRecord> poll() throws InterruptedException {
@@ -83,11 +124,12 @@ public class MQTTSourceTask extends SourceTask implements IMqttMessageListener {
         return records;
     }
 
-    public void stop() {
-        if (mqttClient.isConnected()) {
+    @Override
+    public synchronized void stop() {
+        if (mqttAsyncClient.isConnected()) {
             try {
-                log.debug("Disconnecting from MQTT Broker " + config.getString(MQTTSourceConnectorConfig.BROKER));
-                mqttClient.disconnect();
+                log.debug("Disconnecting from MQTT Broker " + config.getString(MQTTSourceConnectorConfig.MQTT_BROKER));
+                mqttAsyncClient.disconnect();
             } catch (MqttException mqttException) {
                 log.error("Exception thrown while disconnecting client.", mqttException);
             }
@@ -98,15 +140,4 @@ public class MQTTSourceTask extends SourceTask implements IMqttMessageListener {
         return Version.getVersion();
     }
 
-
-    /**
-     * Callback method when a MQTT message arrives at the Topic
-     */
-    @Override
-    public void messageArrived(String topic, MqttMessage mqttMessage) throws Exception {
-        log.debug("Message arrived in connector from topic " + topic);
-        SourceRecord record = mqttSourceConverter.convert(topic, mqttMessage);
-        log.debug("Converted record: " + record);
-        sourceRecordDeque.add(record);
-    }
 }

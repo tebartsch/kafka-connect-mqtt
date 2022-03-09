@@ -1,65 +1,54 @@
 # kafka-connect-mqtt
 
-This repo contains a MQTT Source and Sink Connector for Apache Kafka. It is tested with Kafka 2+.
-
-Using the Source connector you can subscribe to a MQTT topic and write these messages to a Kafka topic.
-
-The Sink connector works the other way around.
-
-Note: 
-* SSL connections are not supported at the moment
-* The connector works only with a single task. Settings maxTasks > 1 has no effect.
-
-## Building the connector
-
-To build the connector, you must have the following installed:
-
-* Java 8 or later
-* Maven
-* GIT
-
-Clone the repository with the following command:
-```
-git clone https://github.com/johanvandevenne/kafka-connect-mqtt.git
-```
-Change directory into the `kafka-connect-mqtt` directory
-```
-cd kafka-connect-mqtt
-```
-Build the connector using Maven
+Build the connector using maven
 ```
 mvn clean install
 ```
-## Installing the connector
 
-### Prerequisites
+## Start the test stack
 
-You must have Kafka 2+ installed
-
-
-### Installing
-
-* Copy the folder `/target/kafka-connect-mqtt-1.0-0-package/share/kafka-connect-mqtt` to your Kafka Connect plugin path
-* Restart Kafka Connect
-* Check if the connector has been loaded succesfully
-
+Copy folder `/target/kafka-connect-mqtt-1.0.0-package/share/kafka-connect-mqtt` to plugin path
 ```
-http://<kafkaconnect>:8083/connector-plugins
+rm -r test/kafka/libs/plugins/kafka-connect-mqtt
+cp -r target/kafka-connect-mqtt-1.0.0-package/kafka-connect-mqtt test/kafka/libs/plugins
 ```
-If you see these entries, the connector has been installed succesfully
 
+Start the test stack
 ```
-{
-    "class": "MQTTSinkConnector",
-    "type": "sink",
-    "version": "1.0.0"
-},
+cd test
+docker stack up -c docker-compose.yml kafka-connect-mqtt
+```
+and monitor with kafka-ui at http://127.0.0.1:8081.
+
+### Verify Plugin Availability
+
+Check if the kafka connect can find the plugins.
+```
+curl http://127.0.0.1:8083/connector-plugins
+```
+
+If following entries are present, the connectors are available.
+```
 {
     "class": "MQTTSourceConnector",
     "type": "source",
     "version": "1.0.0"
 },
+{
+    "class": "MQTTSinkConnector",
+    "type": "sink",
+    "version": "1.0.0"
+},
 ```
+### Change plugin log level
+
+To change the log level of the connector dynamically use
+```
+curl -s -X PUT -H "Content-Type:application/json" \
+    http://localhost:8083/admin/loggers/com.bartsch \
+    -d '{"level": "DEBUG"}' | jq '.'
+```
+
 
 ## Configuring the Source connector
 
@@ -68,16 +57,17 @@ The MQTT Source connector subscribes to a Topic on a MQTT Broker and sends the m
 Here is a basic configuration example:
 ```
 curl -X POST \
-  http://<kafkaconnect>:8083/connectors \
+  http://127.0.0.1:8083/connectors \
   -H 'Content-Type: application/json' \
   -d '{ "name": "mqtt-source-connector",
     "config":
     {
-      "connector.class":"be.jovacon.kafka.connect.MQTTSourceConnector",
-      "mqtt.topic":"my_mqtt_topic",
-      "kafka.topic":"my_kafka_topic",
-      "mqtt.clientID":"my_client_id",
-      "mqtt.broker":"tcp://127.0.0.1:1883",
+      "connector.class":"com.bartsch.kafka.connect.MQTTSourceConnector",
+      "kafka.topic":"c.",
+      "kafka.topic.append-mqtt-topic-name":true,
+      "mqtt.topic-filter-list":"a/#,b/#",
+      "mqtt.client-id":"kafka-forwarder",
+      "mqtt.broker":"tcp://mosquitto:1883",
       "key.converter":"org.apache.kafka.connect.storage.StringConverter",
       "key.converter.schemas.enable":false,
       "value.converter":"org.apache.kafka.connect.storage.StringConverter",
@@ -85,14 +75,23 @@ curl -X POST \
     }
 }'
 ```
-### Optional Configuration options
-* `mqtt.qos` (optional): 0 – At most Once, 1 – At Least Once, 2 – Exactly Once
-* `mqtt.automaticReconnect` (optional)(default: true): Should the client automatically reconnect in case of connection failures
-* `mqtt.keepAliveInterval` (optional)(default: 60 seconds)
-* `mqtt.cleanSession` (optional)(default: true): Controls the state after disconnecting the client from the broker.
-* `mqtt.connectionTimeout` (optional)(default: 30 seconds)
-* `mqtt.username` (optional): Username to connect to MQTT broker
-* `mqtt.password` (optional): Password to connect to MQTT broker
+### List of configuration options
+
+| Name                                 | Required | Default  | Description                                                                                                                               |
+|:-------------------------------------|----------|----------|-------------------------------------------------------------------------------------------------------------------------------------------|
+| `kafka.topic`                        | yes      |          | Kafka topic to write mqtt messages to.                                                                                                    |
+| `kafka.topic.append-mqtt-topic-name` | no       | `false`  | I.e. convert mqtt topic `"a/b/c"` to `"a.b.c"` and append `".a.b.c"` to `kafka.topic`.                                               |
+| `mqtt.topic-filter-list`             | yes      |          | Multiple topic filters possibly containing wildcards. Mqtt message from these topics are fowarded to kafka. (Example value: `a/#,b/#,c/d`) |
+| `mqtt.client-id`                     | yes      |          | Mqtt client id.                                                                                |
+| `mqtt.broker`                        | yes      |          | Mqtt broker location. (example value: `tcp://localhost:1883`)                                                                             |
+| `mqtt.qos`                           | no       | `1`      | 0 – At most Once, 1 – At Least Once, 2 – Exactly Once                                                                                     |
+| `mqtt.automatic-reconnect`           | no       | `true`   |                                                                                                                                           |
+| `mqtt.keep-alive-interval`           | no       | `60`     | Controls the state after disconnecting the client from the broker                                                                         |
+| `mqtt.clean-start`                   | no       | `true`   |                                                                                                                                           |
+| `mqtt.connection-timeout`            | no       | `30`     |                                                                                                                                           |
+| `mqtt.username`                      | no       | `""`     | Username to connect to MQTT broker                                                                                                        |
+| `mqtt.password`                      | no       | `""`     | Password to connect to MQTT broker                                                                                                        |
+
 
 ## Configuring the Sink connector
 
@@ -101,16 +100,17 @@ The MQTT Sink Connector reads messages from a Kafka topic and publishes them to 
 Here is a basic configuration example:
 ```
 curl -X POST \
-  http://<kafkaconnect>>:8083/connectors \
+  http://127.0.0.1:8083/connectors \
   -H 'Content-Type: application/json' \
   -d '{ "name": "mqtt-sink-connector",
     "config":
     {
-      "connector.class":"be.jovacon.kafka.connect.MQTTSinkConnector",
-      "mqtt.topic":"my_mqtt_topic",
-      "topics":"my_kafka_topic",
-      "mqtt.clientID":"my_client_id",
-      "mqtt.broker":"tcp://127.0.0.1:1883",
+      "connector.class":"com.bartsch.kafka.connect.MQTTSinkConnector",
+      "topics.regex":"t.(.*)",
+      "mqtt.topic":"s/",
+      "mqtt.topic.append-kafka-topic-name":true,
+      "mqtt.client-id": "kafka-receiver",
+      "mqtt.broker":"tcp://mosquitto:1883",
       "key.converter":"org.apache.kafka.connect.storage.StringConverter",
       "key.converter.schemas.enable":false,
       "value.converter":"org.apache.kafka.connect.storage.StringConverter",
@@ -120,15 +120,25 @@ curl -X POST \
 ```
 
 ### Optional Configuration options
-* `mqtt.qos` (optional): 0 – At most Once, 1 – At Least Once, 2 – Exactly Once
-* `mqtt.automaticReconnect` (optional)(default: true): Should the client automatically reconnect in case of connection failures
-* `mqtt.keepAliveInterval` (optional)(default: 60 seconds)
-* `mqtt.cleanSession` (optional)(default: true): Controls the state after disconnecting the client from the broker.
-* `mqtt.connectionTimeout` (optional)(default: 30 seconds)
-* `mqtt.username` (optional): Username to connect to MQTT broker
-* `mqtt.password` (optional): Password to connect to MQTT broker
+
+| Name                                  | Required | Default  | Description                                                                            |
+|:--------------------------------------|----------|----------|----------------------------------------------------------------------------------------|
+| `topics`                              | yes      |          | Kafka topics to consume. (example valiue: `topic1,topic2`)                             |
+| `topics.regex`                        | (yes)    |          | Regular expression giving topics to consume. Only use `topics` OR `topics.regex`.      |
+| `mqtt.topic`                          | yes      |          | Mqtt topic to publish messages to. (Example value: `a/b`)                              |
+| `mqtt.topic.append-kafka-topic-name`  | no       | `false`  | I.e. convert kafka topic `"a.b.c"` to `"a/b/c"` and append `".a.b.c"` to `mqtt.topic`. |
+| `mqtt.client-id`                      | yes      |          | Mqtt client id.                                                                        |
+| `mqtt.broker`                         | yes      |          | Mqtt broker location. (example value: `tcp://localhost:1883`)                          |
+| `mqtt.qos`                            | no       | `1`      | 0 – At most Once, 1 – At Least Once, 2 – Exactly Once                                  |
+| `mqtt.automatic-reconnect`            | no       | `true`   |                                                                                        |
+| `mqtt.keep-alive-interval`            | no       | `60`     | Controls the state after disconnecting the client from the broker                      |
+| `mqtt.clean-start`                    | no       | `true`   |                                                                                        |
+| `mqtt.connection-timeout`             | no       | `30`     |                                                                                        |
+| `mqtt.username`                       | no       | `""`     | Username to connect to MQTT broker                                                     |
+| `mqtt.password`                       | no       | `""`     | Password to connect to MQTT broker                                                     |
 
 
 ## Authors
 
 * **Johan Vandevenne** - *Initial work* 
+* **Tilmann Bartsch** - *Mqtt 5, Topic Mappings*

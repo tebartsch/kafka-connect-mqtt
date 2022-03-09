@@ -20,8 +20,8 @@ public class MQTTSinkConnector extends SinkConnector {
 
     @Override
     public void start(Map<String, String> map) {
-        this.mqttSinkConnectorConfig = new MQTTSinkConnectorConfig(map);
-        this.configProps = Collections.unmodifiableMap(map);
+        mqttSinkConnectorConfig = new MQTTSinkConnectorConfig(map);
+        configProps = Collections.unmodifiableMap(map);
     }
 
     @Override
@@ -31,13 +31,8 @@ public class MQTTSinkConnector extends SinkConnector {
 
     @Override
     public List<Map<String, String>> taskConfigs(int maxTasks) {
-        log.debug("Enter taskconfigs");
-        if (maxTasks > 1) {
-            log.info("maxTasks is " + maxTasks + ". MaxTasks > 1 is not supported in this connector.");
-        }
         List<Map<String, String>> taskConfigs = new ArrayList<>(1);
         taskConfigs.add(new HashMap<>(configProps));
-
         log.debug("Taskconfigs: " + taskConfigs);
         return taskConfigs;
     }

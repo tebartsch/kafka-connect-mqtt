@@ -1,7 +1,7 @@
-package be.jovacon.kafka.connect;
+package com.bartsch.kafka.connect;
 
-import be.jovacon.kafka.connect.config.MQTTSinkConnectorConfig;
-import be.jovacon.kafka.connect.config.MQTTSourceConnectorConfig;
+import com.bartsch.kafka.connect.config.MQTTSinkConnectorConfig;
+import com.bartsch.kafka.connect.config.MQTTSourceConnectorConfig;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.apache.kafka.connect.sink.SinkTask;

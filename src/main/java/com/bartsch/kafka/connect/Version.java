@@ -1,6 +1,6 @@
 
 
-package be.jovacon.kafka.connect;
+package com.bartsch.kafka.connect;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

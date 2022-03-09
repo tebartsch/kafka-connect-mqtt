@@ -1,6 +1,6 @@
-package be.jovacon.kafka.connect;
+package com.bartsch.kafka.connect;
 
-import be.jovacon.kafka.connect.config.MQTTSourceConnectorConfig;
+import com.bartsch.kafka.connect.config.MQTTSourceConnectorConfig;
 import com.github.jcustenborder.kafka.connect.utils.data.SourceRecordDeque;
 import com.github.jcustenborder.kafka.connect.utils.data.SourceRecordDequeBuilder;
 import org.apache.kafka.connect.errors.ConnectException;

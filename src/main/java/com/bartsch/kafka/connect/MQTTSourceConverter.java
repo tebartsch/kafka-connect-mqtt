@@ -1,6 +1,6 @@
-package be.jovacon.kafka.connect;
+package com.bartsch.kafka.connect;
 
-import be.jovacon.kafka.connect.config.MQTTSourceConnectorConfig;
+import com.bartsch.kafka.connect.config.MQTTSourceConnectorConfig;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.header.ConnectHeaders;
 import org.apache.kafka.connect.source.SourceRecord;

@@ -1,4 +1,4 @@
-package be.jovacon.kafka.connect.config;
+package com.bartsch.kafka.connect.config;
 
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigDef;

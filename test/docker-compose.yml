@@ -1,0 +1,81 @@
+version: "3.7"
+
+services:
+
+  mosquitto:
+    image: eclipse-mosquitto:2.0.14
+
+    ports:
+      - 1883:1883
+
+    volumes:
+      - "./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro"
+
+    networks:
+      - net
+
+  zookeeper:
+    image: bitnami/zookeeper:3.6.3
+
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+
+    networks:
+      - net
+
+
+  kafka:
+    image: bitnami/kafka:3.1.0
+
+    ports:
+      - 9092:9092
+
+    environment:
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+
+    depends_on:
+      - zookeeper
+
+    networks:
+      - net
+
+  kafka-connect:
+    image: bitnami/kafka:3.1.0
+
+    ports:
+      - 8083:8083
+
+    volumes:
+      - ./kafka/config/connect-distributed.properties:/opt/bitnami/kafka/config/connect-distributed.properties
+      - ./kafka/libs/plugins/:/opt/bitnami/kafka/libs/plugins/
+
+    depends_on:
+      - zookeeper
+      - kafka
+
+    command: /opt/bitnami/kafka/bin/connect-distributed.sh /opt/bitnami/kafka/config/connect-distributed.properties
+
+    networks:
+      - net
+
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+
+    ports:
+        - 8081:8081
+
+    environment:
+        - SERVER_PORT=8081
+        - KAFKA_CLUSTERS_0_NAME=kaffee
+        - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+        - KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME=kafka-broker
+        - KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS=http://kafka-connect:8083
+
+    networks:
+      - net
+
+
+networks:
+  net:

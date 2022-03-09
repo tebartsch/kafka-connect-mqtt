@@ -1,0 +1,4 @@
+.idea
+target
+
+test/kafka/libs/plugins/kafka-connect-mqtt
